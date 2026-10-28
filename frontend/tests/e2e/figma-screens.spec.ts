@@ -329,3 +329,98 @@ test("Procurement notification alerts do not reveal customer payment holds", asy
   await expect(popup.getByText("Shipment blocked")).toHaveCount(0);
   await expect(popup.getByText("Overdue")).toBeVisible();
 });
+
+
+test("Status editor persists RFQ to QUOTED, refreshes badge, and confirms success", async ({page}) => {
+  await boot(page, "SALES");
+  let persistedStatus = "RFQ";
+  const sent: string[] = [];
+  await page.route("**/api/projects/p3**", async route => {
+    const req = route.request();
+    if (req.method() === "PATCH" && req.url().endsWith("/status")) {
+      const payload = req.postDataJSON() as { status: string };
+      sent.push(payload.status);
+      persistedStatus = payload.status;
+      return route.fulfill({
+        status: 200, contentType: "application/json",
+        body: JSON.stringify({ id: "p3", status: persistedStatus }),
+      });
+    }
+    if (req.method() === "GET" && new URL(req.url()).pathname.endsWith("/projects/p3")) {
+      return route.fulfill({
+        status: 200, contentType: "application/json",
+        body: JSON.stringify({
+          ...safeProject(otherProjects[1], "SALES"),
+          status: persistedStatus, activities, expenses: [],
+        }),
+      });
+    }
+    await route.fallback();
+  });
+  await page.goto("/projects/p3");
+  const editor = page.getByTestId("project-status-editor");
+  await expect(editor.getByText("Current status:")).toContainText("RFQ");
+  await expect(editor.getByRole("button", {name:"Update Status"})).toBeDisabled();
+  await editor.getByRole("combobox",{name:"New project status"}).selectOption("QUOTED");
+  await editor.getByRole("button",{name:"Update Status"}).click();
+  await expect(editor.getByText("Current status:")).toContainText("QUOTED");
+  await expect(editor.getByRole("status")).toContainText("Project status changed to QUOTED.");
+  expect(sent).toEqual(["QUOTED"]);
+});
+
+test("Status dropdown follows role authorization and forward-only rules", async ({page}) => {
+  await boot(page,"SALES");
+  await page.goto("/projects/p3");
+  let select=page.getByRole("combobox",{name:"New project status"});
+  await expect(select.locator("option")).toHaveCount(2);
+  await expect(select.locator('option[value="QUOTED"]')).toHaveCount(1);
+  await expect(select.locator('option[value="ORDERED"]')).toHaveCount(0);
+});
+
+test("Admin can choose a later status, but never go backwards", async ({page}) => {
+  await boot(page,"ADMIN");
+  await page.goto("/projects/p3");
+  const select=page.getByRole("combobox",{name:"New project status"});
+  await expect(select.locator('option[value="SHIPPING"]')).toHaveCount(1);
+  await expect(select.locator('option[value="CLOSED"]')).toHaveCount(1);
+  await page.goto("/projects/p1");
+  const next=page.getByRole("combobox",{name:"New project status"});
+  await expect(next.locator('option[value="RFQ"]')).toHaveCount(0);
+  await expect(next.locator('option[value="CLOSED"]')).toHaveCount(1);
+});
+
+test("Status change shows server rejection and preserves current status", async ({page}) => {
+  await boot(page,"ADMIN");
+  await page.route("**/api/projects/p1/status", async route => {
+    if (route.request().method() !== "PATCH") return route.fallback();
+    await route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({error:"Cannot close: outstanding customer balance of 2000.00. Admin must use the override action."}),
+    });
+  });
+  await page.goto("/projects/p1");
+  const editor=page.getByTestId("project-status-editor");
+  await editor.getByRole("combobox",{name:"New project status"}).selectOption("CLOSED");
+  await editor.getByRole("button",{name:"Update Status"}).click();
+  await expect(editor.getByRole("alert")).toContainText("Cannot close: outstanding customer balance");
+  await expect(editor.getByText("Current status:")).toContainText("SHIPPING");
+});
+
+test("Procurement cannot close a project from Shipping", async ({page}) => {
+  await boot(page, "PROCUREMENT");
+  await page.goto("/projects/p1");
+  const editor=page.getByTestId("project-status-editor");
+  await expect(editor.getByText("Only an Admin can close a project from Shipping.")).toBeVisible();
+  await expect(editor.getByRole("combobox",{name:"New project status"})).toHaveCount(0);
+});
+
+test("Status editor stays usable on 419px mobile", async ({page}) => {
+  await page.setViewportSize({width:419,height:918});
+  await boot(page,"ADMIN");
+  await page.goto("/projects/p3");
+  const editor=page.getByTestId("project-status-editor");
+  await expect(editor.getByRole("combobox",{name:"New project status"})).toBeVisible();
+  await editor.getByRole("combobox",{name:"New project status"}).selectOption("QUOTED");
+  await expect(editor.getByRole("button",{name:"Update Status"})).toBeEnabled();
+});
