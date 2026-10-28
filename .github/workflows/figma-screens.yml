@@ -5,6 +5,7 @@ on:
     branches:
       - "seqa/figma-all-screens"
       - "seqa/figma-fidelity-and-workflows"
+      - "seqa/project-status-editor"
   workflow_dispatch:
 
 permissions:

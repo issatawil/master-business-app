@@ -316,6 +316,9 @@ export function ProjectDetailPage() {
   const override = useOverrideHold(id ?? "");
   const updateProject = useUpdateProject(id ?? "");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [desiredStatus, setDesiredStatus] = useState<ProjectStatus | "">("");
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusNotice, setStatusNotice] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [showOverrideForm, setShowOverrideForm] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -360,14 +363,27 @@ export function ProjectDetailPage() {
   const canEditProject = isAdmin || project.status !== "CLOSED";
   const forwardStages = WORKFLOW_ORDER.slice(currentIndex + 1);
   const nextStage = forwardStages[0];
+  // API contract: non-admin staff advance exactly one stage; only Admin
+  // can skip stages or close a project. Backward transitions are prohibited.
+  const allowedStatusChoices = isAdmin
+    ? forwardStages
+    : nextStage && nextStage !== "CLOSED" ? [nextStage] : [];
   const f = project.financial ?? {};
 
-  async function attemptTransition(status: ProjectStatus) {
-    setActionError(null);
+  async function saveProjectStatus(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!desiredStatus || transition.isPending || !allowedStatusChoices.includes(desiredStatus)) return;
+    setStatusError(null);
+    setStatusNotice(null);
     try {
-      await transition.mutateAsync(status);
+      await transition.mutateAsync(desiredStatus);
+      setDesiredStatus("");
+      // The query invalidation updates all project screens, including the
+      // dashboard and status badge. Explicit refetch completes this workflow.
+      await refetch();
+      setStatusNotice(`Project status changed to ${desiredStatus}.`);
     } catch (err: unknown) {
-      setActionError(extractError(err, "Transition failed"));
+      setStatusError(extractError(err, "Could not change project status."));
     }
   }
 
@@ -463,6 +479,68 @@ export function ProjectDetailPage() {
             )}
           </div>
         </div>
+        {!editing && (
+          <section aria-label="Change project status" className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/40 p-4" data-testid="project-status-editor">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-semibold text-neutral-900">Change Project Status</h2>
+                <p className="mt-1 text-xs text-neutral-600">
+                  Current status: <strong>{project.status}</strong>
+                </p>
+              </div>
+              <StatusBadge status={project.status} />
+            </div>
+            {allowedStatusChoices.length ? (
+              <form onSubmit={saveProjectStatus} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1">
+                  <label htmlFor="project-next-status" className="mb-1 block text-xs font-semibold text-neutral-700">
+                    New project status
+                  </label>
+                  <select
+                    id="project-next-status"
+                    aria-label="New project status"
+                    value={desiredStatus}
+                    disabled={transition.isPending}
+                    onChange={(event) => {
+                      setDesiredStatus(event.target.value as ProjectStatus | "");
+                      setStatusError(null);
+                      setStatusNotice(null);
+                    }}
+                    className="min-h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 text-sm text-neutral-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  >
+                    <option value="">Select new status...</option>
+                    {allowedStatusChoices.map(status => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="submit"
+                  disabled={!desiredStatus || transition.isPending}
+                  className="min-h-10 shrink-0 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {transition.isPending ? "Updating..." : "Update Status"}
+                </button>
+              </form>
+            ) : (
+              <p className="mt-3 text-xs text-neutral-600">
+                {project.status === "CLOSED"
+                  ? "This project is closed. Its status cannot be changed."
+                  : "Only an Admin can close a project from Shipping."}
+              </p>
+            )}
+            {allowedStatusChoices.length > 0 && (
+              <p className="mt-2 text-xs leading-relaxed text-neutral-500">
+                Stages: RFQ → QUOTED → ORDERED → SHIPPING → CLOSED. Quoting requires revenue; ordering requires a supplier and cost.
+                Closing requires a settled customer balance, or an Admin override from Shipping.
+                {isAdmin ? " Admin can advance multiple stages." : " You can advance one stage at a time."}
+              </p>
+            )}
+            {statusError && <p role="alert" className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{statusError}</p>}
+            {statusNotice && <p role="status" className="mt-3 rounded-lg bg-green-50 px-3 py-2 text-sm font-medium text-green-800">{statusNotice}</p>}
+          </section>
+        )}
+
         {!isAdmin && project.status === "CLOSED" && (
           <p className="mt-3 text-xs text-neutral-400">Closed — only Admin can make further changes.</p>
         )}
@@ -857,32 +935,11 @@ export function ProjectDetailPage() {
           </div>
         )}
 
-        {/* Workflow transition controls */}
-        {!editing && project.status !== "CLOSED" && (
-          <div className="mb-6 flex flex-wrap items-center gap-2">
-            {nextStage && (
-              <button
-                type="button"
-                onClick={() => attemptTransition(nextStage)}
-                disabled={transition.isPending}
-                className="rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-50"
-              >
-                Move to {nextStage}
-              </button>
-            )}
-            {isAdmin &&
-              forwardStages.slice(1).map((stage) => (
-                <button
-                  key={stage}
-                  type="button"
-                  onClick={() => attemptTransition(stage)}
-                  disabled={transition.isPending}
-                  className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
-                >
-                  Skip to {stage} (Admin)
-                </button>
-              ))}
-          </div>
+        {/* Status changes use the labeled editor in the project header. */}
+        {!editing && (
+          <p className="text-xs text-neutral-500">
+            Use <strong>Change Project Status</strong> above to update this workflow. All changes are recorded in the Activity Timeline.
+          </p>
         )}
         {actionError && <p className="mb-4 text-sm text-red-600">{actionError}</p>}
 
