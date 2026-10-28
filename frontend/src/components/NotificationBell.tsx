@@ -1,9 +1,26 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Link } from "react-router-dom";
 import { useDismissedOverdueProjectIds, useDismissOverdueNotification } from "../hooks/useNotifications";
 import { useProjects } from "../hooks/useProjects";
 import { formatDate } from "../lib/format";
 import { BellIcon } from "./icons";
+
+type AlertKind = "Overdue" | "Shipment blocked" | "Low margin" | "Missing next action";
+interface Alert {
+  id: string;
+  projectId: string;
+  projectName: string;
+  dueDate: string | null;
+  kind: AlertKind;
+  dismissOnView: boolean;
+}
+
+const styles: Record<AlertKind, string> = {
+  "Overdue": "bg-red-50 text-red-700",
+  "Shipment blocked": "bg-red-50 text-red-700",
+  "Low margin": "bg-amber-50 text-amber-800",
+  "Missing next action": "bg-neutral-100 text-neutral-700",
+};
 
 export function NotificationBell({
   onNavigate,
@@ -12,80 +29,86 @@ export function NotificationBell({
 }: {
   onNavigate?: () => void;
   buttonClassName?: string;
-  // The dropdown anchors to whichever side has room to open without leaving the
-  // viewport: "left" (extends rightward) fits the desktop sidebar, where the bell
-  // sits near the left edge; "right" (extends leftward) fits the mobile top bar,
-  // where the bell sits at the far right — a fixed left-0 there pushed ~240px of
-  // a 288px-wide panel off the right edge of a 320px screen.
   align?: "left" | "right";
 }) {
-  // "Overdue" is purely a function of the clock, not of any mutation — a project can silently
-  // cross into overdue with zero user action, which none of React Query's default refetch
-  // triggers (mount, window focus, cache invalidation) would ever catch. A light poll is the
-  // simplest fix that doesn't need a WebSocket or background worker.
   const { data: projects } = useProjects({ refetchInterval: 60_000 });
   const { data: dismissedIds } = useDismissedOverdueProjectIds();
   const dismissOverdue = useDismissOverdueNotification();
   const [open, setOpen] = useState(false);
-
+  const popupId = useId();
   const dismissed = new Set(dismissedIds ?? []);
-  const overdue = (projects ?? []).filter((p) => p.needsAttention.overdue && !dismissed.has(p.id));
 
-  function handleSelect(projectId: string) {
+  // Needs-attention flags arrive already filtered by server-side RBAC.
+  // Never infer low-margin/cost or customer-balance status in the browser.
+  const alerts: Alert[] = [];
+  for (const project of projects ?? []) {
+    const base = { projectId: project.id, projectName: project.projectName, dueDate: project.dueDate };
+    if (project.needsAttention.overdue && !dismissed.has(project.id))
+      alerts.push({ ...base, id: project.id + ":overdue", kind: "Overdue", dismissOnView: true });
+    if (project.needsAttention.blockedShipment)
+      alerts.push({ ...base, id: project.id + ":hold", kind: "Shipment blocked", dismissOnView: false });
+    if (project.needsAttention.lowMargin)
+      alerts.push({ ...base, id: project.id + ":margin", kind: "Low margin", dismissOnView: false });
+    if (project.needsAttention.missingNextAction)
+      alerts.push({ ...base, id: project.id + ":action", kind: "Missing next action", dismissOnView: false });
+  }
+  const priority: Record<AlertKind, number> = {
+    "Shipment blocked": 0, "Overdue": 1, "Low margin": 2, "Missing next action": 3,
+  };
+  alerts.sort((a,b)=>priority[a.kind]-priority[b.kind] || a.projectName.localeCompare(b.projectName));
+  const count = alerts.length;
+
+  function handleSelect(alert: Alert) {
     setOpen(false);
     onNavigate?.();
-    // Permanent, per-account dismissal — following the link means "I've seen this
-    // one," so it stops counting toward the badge/list from now on, everywhere
-    // this account signs in, not just for this browser session.
-    dismissOverdue.mutate(projectId);
+    // Only overdue notifications have persisted dismissals in the backend.
+    // All other alerts stay visible until the underlying business issue is fixed.
+    if (alert.dismissOnView) dismissOverdue.mutate(alert.projectId);
   }
 
   return (
     <div className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-label="Overdue notifications"
-        className={`relative rounded-md p-1.5 ${buttonClassName}`}
-      >
+      <button type="button" onClick={()=>setOpen(v=>!v)}
+        aria-label="Notifications" aria-expanded={open} aria-controls={open?popupId:undefined}
+        className={`relative rounded-lg p-2 transition ${buttonClassName}`}>
         <BellIcon className="h-5 w-5" />
-        {!open && overdue.length > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold leading-none text-white">
-            {overdue.length > 9 ? "9+" : overdue.length}
+        {count > 0 && (
+          <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold leading-none text-white">
+            {count>9?"9+":count}
           </span>
         )}
       </button>
-
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden="true" />
-          <div
-            className={`absolute top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-neutral-200 bg-white shadow-lg ${
-              align === "right" ? "right-0" : "left-0"
-            }`}
-          >
-            <div className="border-b border-neutral-100 px-3 py-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                Overdue Projects {overdue.length > 0 && `(${overdue.length})`}
-              </p>
+          <button type="button" className="fixed inset-0 z-40 cursor-default" onClick={()=>setOpen(false)} aria-label="Close notifications" />
+          <div id={popupId} role="dialog" aria-label="Notifications"
+            className={`absolute top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-xl ${align==="right"?"right-0":"left-0"}`}>
+            <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-600">Notifications ({count})</h2>
+              <button type="button" onClick={()=>setOpen(false)} className="rounded px-2 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-100">Close</button>
             </div>
-            <div className="max-h-80 overflow-y-auto py-1">
-              {overdue.length === 0 ? (
-                <p className="px-3 py-3 text-sm text-neutral-400">Nothing overdue. You're all caught up.</p>
-              ) : (
-                overdue.map((p) => (
-                  <Link
-                    key={p.id}
-                    to={`/projects/${p.id}`}
-                    onClick={() => handleSelect(p.id)}
-                    className="block px-3 py-2 hover:bg-neutral-50"
-                  >
-                    <p className="truncate text-sm font-medium text-neutral-900">{p.projectName}</p>
-                    <p className="text-xs text-red-600">Due {formatDate(p.dueDate)} · Overdue</p>
-                  </Link>
-                ))
-              )}
+            <div className="max-h-[min(24rem,65vh)] overflow-y-auto">
+              {count===0 ? (
+                <p className="px-4 py-6 text-sm text-neutral-500">Nothing needs attention. You're all caught up.</p>
+              ) : alerts.slice(0,30).map(alert=>(
+                <Link key={alert.id} to={`/projects/${alert.projectId}`} onClick={()=>handleSelect(alert)}
+                  className="block border-b border-neutral-100 px-4 py-3 transition last:border-b-0 hover:bg-neutral-50">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="min-w-0 truncate text-sm font-semibold text-neutral-900">{alert.projectName}</p>
+                    <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${styles[alert.kind]}`}>{alert.kind}</span>
+                  </div>
+                  <p className="mt-1 text-xs text-neutral-500">
+                    {alert.kind === "Overdue" ? `Due ${formatDate(alert.dueDate)}` :
+                      alert.kind === "Missing next action" ? "Set a next action in project details" :
+                      alert.kind === "Shipment blocked" ? "Review the shipment hold in project details" :
+                      "Review this project's margin"}
+                  </p>
+                </Link>
+              ))}
             </div>
+            {count>0 && <p className="border-t border-neutral-100 px-4 py-2 text-[11px] text-neutral-400">
+              Other alerts disappear when the underlying issue is resolved.
+            </p>}
           </div>
         </>
       )}

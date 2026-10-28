@@ -47,7 +47,41 @@ function PaymentTable({
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-neutral-200/70 bg-white shadow-sm">
+      <div className="grid gap-3 md:hidden" data-testid={`payments-${side}-mobile`}>
+        {active.length === 0 && (
+          <p className="rounded-xl border border-neutral-200 bg-white p-5 text-sm text-neutral-500">Nothing outstanding.</p>
+        )}
+        {active.map(p => {
+          const currency = p.financial?.currency ?? "USD";
+          const canRecord = user?.role === "ADMIN" || p.status !== "CLOSED";
+          return (
+            <article key={p.id} className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+              <Link to={`/projects/${p.id}`} className="block text-sm font-semibold text-neutral-900 hover:text-indigo-700">{p.projectName}</Link>
+              <p className="mt-1 text-xs text-neutral-500">{side === "customer" ? p.customer?.name : p.supplier?.name}</p>
+              <div className="mt-4 grid grid-cols-2 gap-3 border-t border-neutral-100 pt-3">
+                <div>
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-400">Paid</p>
+                  <p className="mt-1 text-sm tabular-nums text-neutral-700">{formatCurrency(p.financial?.[paidField], currency)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-400">Outstanding</p>
+                  <p className="mt-1 text-sm font-semibold tabular-nums text-indigo-700">{formatCurrency(p.financial?.[balanceField], currency)}</p>
+                </div>
+              </div>
+              {canRecord && openFor !== p.id && (
+                <button type="button" onClick={() => setOpenFor(p.id)}
+                  className="mt-3 inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">
+                  Record payment
+                </button>
+              )}
+              {openFor === p.id && (
+                <div className="mt-3"><RecordPaymentForm project={p} side={side} onDone={() => setOpenFor(null)} /></div>
+              )}
+            </article>
+          );
+        })}
+      </div>
+      <div className="hidden overflow-hidden rounded-xl border border-neutral-200/70 bg-white shadow-sm md:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[440px] text-left text-sm">
             <thead className="bg-neutral-50 text-[10px] font-semibold uppercase tracking-wide text-neutral-500">

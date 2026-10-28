@@ -127,7 +127,7 @@ const desktop: Screen[] = [
   {figma:"03",label:"Dashboard — Sales",url:"/",role:"SALES",expected:"Sales Overview"},
   {figma:"04",label:"Dashboard — Procurement",url:"/",role:"PROCUREMENT",expected:"Procurement Overview"},
   {figma:"05",label:"Daily Brief drawer",url:"/",role:"ADMIN",expected:"Recommended Focus",action:"brief"},
-  {figma:"06",label:"Notification dropdown",url:"/",role:"ADMIN",expected:"Overdue Projects",action:"bell"},
+  {figma:"06",label:"Notification dropdown",url:"/",role:"ADMIN",expected:"Notifications (",action:"bell"},
   {figma:"07",label:"Projects list",url:"/projects",role:"ADMIN",expected:"Manage customer requests"},
   {figma:"08",label:"New RFQ",url:"/projects/new",role:"SALES",expected:"New Project (RFQ)"},
   {figma:"09",label:"Project detail — Admin",url:"/projects/p1",role:"ADMIN",expected:"Financial Overview"},
@@ -162,7 +162,7 @@ for (const screen of [...desktop, ...mobile]) {
       await page.getByRole("button", {name:"Generate", exact:true}).click();
       await page.getByRole("button", {name:/View details/}).click();
     }
-    if (screen.action === "bell") await page.getByRole("button", {name:"Overdue notifications"}).click();
+    if (screen.action === "bell") await page.getByRole("button", {name:"Notifications"}).click();
     if (screen.action === "override") await page.getByRole("button", {name:"Admin Override"}).click();
     if (screen.action === "drawer") await page.getByRole("button", {name:"Open menu"}).click();
     const key = screen.expected;
@@ -176,8 +176,9 @@ for (const screen of [...desktop, ...mobile]) {
     if (screen.figma === "11") await expect(page.getByText("Supplier / Cost")).toHaveCount(0);
     if (screen.figma === "12") await expect(page.getByText("Customer / Revenue")).toHaveCount(0);
     if (screen.figma === "M03") {
-      const table = page.locator("table").first();
-      await expect(table).toBeVisible();
+      await expect(page.getByTestId("projects-mobile-list")).toBeVisible();
+      await expect(page.getByRole("link",{name:"View project details"}).first()).toBeVisible();
+      await expect(page.locator("table")).toBeHidden();
     }
     // No content area should exceed the 419px viewport except intentional
     // horizontally scrollable data tables in the Figma mobile spec.
@@ -190,7 +191,7 @@ test("Create RFQ form submits real validated fields", async ({page}) => {
   await boot(page,"SALES");
   await page.goto("/projects/new");
   await page.getByText("Project Name").locator("..").locator("input").fill("New sample RFQ");
-  await page.getByText("Customer", {exact:true}).locator("..").locator("select").selectOption("c1");
+  await page.locator("#new-project-customer").selectOption("c1");
   await page.getByText("Est. Revenue (rough ask)").locator("..").locator("input").fill("100");
   await page.getByRole("button",{name:"Create Project"}).click();
   await expect(page).toHaveURL(/\/projects\/created-qa-01$/);
@@ -207,6 +208,7 @@ test("Admin and Procurement navigation do not leak restricted tabs", async ({pag
 test("Customer creation form posts and closes on success", async ({page}) => {
   await boot(page,"SALES");
   await page.goto("/customers");
+  await page.getByRole("button", {name:"+ Add Customer"}).click();
   await page.getByPlaceholder("Name", {exact:true}).fill("New Customer");
   await page.getByRole("button",{name:"Create Customer"}).click();
   await expect(page.getByPlaceholder("Name", {exact:true})).toHaveCount(0);
@@ -215,6 +217,7 @@ test("Customer creation form posts and closes on success", async ({page}) => {
 test("Supplier creation form posts and closes on success", async ({page}) => {
   await boot(page,"PROCUREMENT");
   await page.goto("/suppliers");
+  await page.getByRole("button", {name:"+ Add Supplier"}).click();
   await page.getByPlaceholder("Name", {exact:true}).fill("New Supplier");
   await page.getByRole("button",{name:"Create Supplier"}).click();
   await expect(page.getByPlaceholder("Name", {exact:true})).toHaveCount(0);
@@ -224,9 +227,9 @@ test("Payment can be recorded from Figma Payments table", async ({page}) => {
   await boot(page,"ADMIN");
   await page.goto("/payments");
   await page.getByRole("button",{name:"Record payment"}).first().click();
-  await page.getByPlaceholder("Amount").fill("100");
+  await page.locator('input[placeholder="Amount"]:visible').fill("100");
   await page.getByRole("button",{name:"Record Payment",exact:true}).click();
-  await expect(page.getByPlaceholder("Amount")).toHaveCount(0);
+  await expect(page.locator('input[placeholder="Amount"]:visible')).toHaveCount(0);
 });
 
 test("Ask My Business displays grounded answers and project links", async ({page}) => {
@@ -255,4 +258,74 @@ test("Admin override requires written reason", async ({page}) => {
   await reason.fill("Approved by finance after review.");
   await page.getByRole("button",{name:"Confirm Override"}).click();
   await expect(reason).toHaveCount(0);
+});
+
+test("Mobile projects filter and open the selected project", async ({page}) => {
+  await page.setViewportSize({width:419,height:918});
+  await boot(page,"ADMIN");
+  await page.goto("/projects");
+  await page.getByRole("combobox",{name:"Filter projects by status"}).selectOption("QUOTED");
+  await expect(page.getByTestId("projects-mobile-list").locator("article")).toHaveCount(1);
+  await page.getByPlaceholder("Search projects or customers...").fill("Acme Office");
+  await expect(page.getByTestId("projects-mobile-list").getByText("Acme Office Furniture Batch 3")).toBeVisible();
+  await page.getByRole("link",{name:"View project details"}).click();
+  await expect(page).toHaveURL(/\/projects\/p2$/);
+});
+
+test("Mobile payments show touch-friendly cards and recording forms", async ({page}) => {
+  await page.setViewportSize({width:419,height:918});
+  await boot(page,"ADMIN");
+  await page.goto("/payments");
+  const cards=page.getByTestId("payments-customer-mobile");
+  await expect(cards).toBeVisible();
+  await cards.getByRole("button",{name:"Record payment"}).first().click();
+  await cards.getByPlaceholder("Amount").fill("100");
+  await cards.getByRole("button",{name:"Record Payment",exact:true}).click();
+  await expect(cards.getByPlaceholder("Amount")).toHaveCount(0);
+});
+
+test("Figma project detail has side-by-side workflow and financial sections on desktop", async ({ page }) => {
+  await page.setViewportSize({ width: 1546, height: 1000 });
+  await boot(page, "ADMIN");
+  await page.goto("/projects/p1");
+  const main = await page.getByTestId("project-main-column").boundingBox();
+  const side = await page.getByTestId("project-sidebar-column").boundingBox();
+  expect(main).not.toBeNull();
+  expect(side).not.toBeNull();
+  expect(side!.x).toBeGreaterThan(main!.x + main!.width - 2);
+  expect(Math.abs(side!.y - main!.y)).toBeLessThan(3);
+  await expect(page.getByText("Project Overview")).toBeVisible();
+  await expect(page.getByText("Financial Overview")).toBeVisible();
+  await expect(page.getByText("Activity Timeline")).toBeVisible();
+});
+
+test("Figma project detail stacks columns on 419px mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 419, height: 918 });
+  await boot(page, "ADMIN");
+  await page.goto("/projects/p1");
+  const main = await page.getByTestId("project-main-column").boundingBox();
+  const side = await page.getByTestId("project-sidebar-column").boundingBox();
+  expect(main).not.toBeNull();
+  expect(side).not.toBeNull();
+  expect(side!.y).toBeGreaterThanOrEqual(main!.y + main!.height - 3);
+  expect(Math.abs(side!.x - main!.x)).toBeLessThan(3);
+});
+
+test("Bell aggregates overdue, shipment holds and missing actions", async ({page}) => {
+  await boot(page,"ADMIN");
+  await page.goto("/");
+  await page.getByRole("button",{name:"Notifications"}).click();
+  const popup=page.getByRole("dialog",{name:"Notifications"});
+  await expect(popup.getByText("Overdue")).toBeVisible();
+  await expect(popup.getByText("Shipment blocked")).toBeVisible();
+  await expect(popup.getByText("Missing next action")).toBeVisible();
+});
+
+test("Procurement notification alerts do not reveal customer payment holds", async ({page}) => {
+  await boot(page,"PROCUREMENT");
+  await page.goto("/");
+  await page.getByRole("button",{name:"Notifications"}).click();
+  const popup=page.getByRole("dialog",{name:"Notifications"});
+  await expect(popup.getByText("Shipment blocked")).toHaveCount(0);
+  await expect(popup.getByText("Overdue")).toBeVisible();
 });
