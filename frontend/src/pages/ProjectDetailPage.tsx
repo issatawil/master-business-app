@@ -467,6 +467,19 @@ export function ProjectDetailPage() {
           <p className="mt-3 text-xs text-neutral-400">Closed — only Admin can make further changes.</p>
         )}
 
+      </header>
+
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.85fr)_minmax(300px,1fr)] xl:gap-5">
+        <div className="min-w-0 space-y-4">
+      <div className="rounded-xl border border-neutral-200/70 bg-white p-6 shadow-sm">
+        <div className="mb-3 flex items-start justify-between gap-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Project Overview</h2>
+          <div className="shrink-0 text-right text-sm">
+            <p className="text-neutral-400">Last Update</p>
+            <p className="text-neutral-800">{formatDate(project.lastUpdate)}</p>
+          </div>
+        </div>
+
         <div className="mt-4 grid grid-cols-2 gap-4 border-t border-neutral-100 pt-4 text-sm sm:grid-cols-3">
           <div>
             <p className="text-neutral-400">Owner</p>
@@ -504,18 +517,6 @@ export function ProjectDetailPage() {
             )}
           </div>
         </div>
-      </header>
-
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.85fr)_minmax(300px,1fr)] xl:gap-5">
-        <div className="min-w-0 space-y-4">
-      <div className="rounded-xl border border-neutral-200/70 bg-white p-6 shadow-sm">
-        <div className="mb-3 flex items-start justify-between gap-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Project Overview</h2>
-          <div className="shrink-0 text-right text-sm">
-            <p className="text-neutral-400">Last Update</p>
-            <p className="text-neutral-800">{formatDate(project.lastUpdate)}</p>
-          </div>
-        </div>
 
         {editing && canEditSupplier && (
           <div className="mb-6 max-w-xs text-sm">
@@ -549,6 +550,8 @@ export function ProjectDetailPage() {
           )}
         </div>
 
+      </div>
+      <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6">
         {/* Financial — server already strips fields the current role can't see */}
         {("estimatedRevenue" in f || "estimatedCost" in f) && (
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">Financial Overview</h2>
