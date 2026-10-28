@@ -176,8 +176,9 @@ for (const screen of [...desktop, ...mobile]) {
     if (screen.figma === "11") await expect(page.getByText("Supplier / Cost")).toHaveCount(0);
     if (screen.figma === "12") await expect(page.getByText("Customer / Revenue")).toHaveCount(0);
     if (screen.figma === "M03") {
-      const table = page.locator("table").first();
-      await expect(table).toBeVisible();
+      await expect(page.getByTestId("projects-mobile-list")).toBeVisible();
+      await expect(page.getByRole("link",{name:"View project details"}).first()).toBeVisible();
+      await expect(page.locator("table")).toBeHidden();
     }
     // No content area should exceed the 419px viewport except intentional
     // horizontally scrollable data tables in the Figma mobile spec.
@@ -255,4 +256,28 @@ test("Admin override requires written reason", async ({page}) => {
   await reason.fill("Approved by finance after review.");
   await page.getByRole("button",{name:"Confirm Override"}).click();
   await expect(reason).toHaveCount(0);
+});
+
+test("Mobile projects filter and open the selected project", async ({page}) => {
+  await page.setViewportSize({width:419,height:918});
+  await boot(page,"ADMIN");
+  await page.goto("/projects");
+  await page.getByRole("combobox",{name:"Filter projects by status"}).selectOption("QUOTED");
+  await expect(page.getByTestId("projects-mobile-list").locator("article")).toHaveCount(1);
+  await page.getByPlaceholder("Search projects or customers...").fill("Acme Office");
+  await expect(page.getByText("Acme Office Furniture Batch 3")).toBeVisible();
+  await page.getByRole("link",{name:"View project details"}).click();
+  await expect(page).toHaveURL(/\/projects\/p2$/);
+});
+
+test("Mobile payments show touch-friendly cards and recording forms", async ({page}) => {
+  await page.setViewportSize({width:419,height:918});
+  await boot(page,"ADMIN");
+  await page.goto("/payments");
+  const cards=page.getByTestId("payments-customer-mobile");
+  await expect(cards).toBeVisible();
+  await cards.getByRole("button",{name:"Record payment"}).first().click();
+  await cards.getByPlaceholder("Amount").fill("100");
+  await cards.getByRole("button",{name:"Record Payment",exact:true}).click();
+  await expect(cards.getByPlaceholder("Amount")).toHaveCount(0);
 });
