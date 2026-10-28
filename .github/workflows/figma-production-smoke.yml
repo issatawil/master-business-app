@@ -2,7 +2,7 @@ name: Figma Production Smoke
 
 on:
   push:
-    branches: ["seqa/figma-all-screens"]
+    branches: ["seqa/figma-all-screens", "seqa/figma-fidelity-and-workflows"]
   workflow_dispatch:
 
 permissions:
