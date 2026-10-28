@@ -281,3 +281,30 @@ test("Mobile payments show touch-friendly cards and recording forms", async ({pa
   await cards.getByRole("button",{name:"Record Payment",exact:true}).click();
   await expect(cards.getByPlaceholder("Amount")).toHaveCount(0);
 });
+
+test("Figma project detail has side-by-side workflow and financial sections on desktop", async ({ page }) => {
+  await page.setViewportSize({ width: 1546, height: 1000 });
+  await boot(page, "ADMIN");
+  await page.goto("/projects/p1");
+  const main = await page.getByTestId("project-main-column").boundingBox();
+  const side = await page.getByTestId("project-sidebar-column").boundingBox();
+  expect(main).not.toBeNull();
+  expect(side).not.toBeNull();
+  expect(side!.x).toBeGreaterThan(main!.x + main!.width - 2);
+  expect(Math.abs(side!.y - main!.y)).toBeLessThan(3);
+  await expect(page.getByText("Project Overview")).toBeVisible();
+  await expect(page.getByText("Financial Overview")).toBeVisible();
+  await expect(page.getByText("Activity Timeline")).toBeVisible();
+});
+
+test("Figma project detail stacks columns on 419px mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 419, height: 918 });
+  await boot(page, "ADMIN");
+  await page.goto("/projects/p1");
+  const main = await page.getByTestId("project-main-column").boundingBox();
+  const side = await page.getByTestId("project-sidebar-column").boundingBox();
+  expect(main).not.toBeNull();
+  expect(side).not.toBeNull();
+  expect(side!.y).toBeGreaterThanOrEqual(main!.y + main!.height - 3);
+  expect(Math.abs(side!.x - main!.x)).toBeLessThan(3);
+});
