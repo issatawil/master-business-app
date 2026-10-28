@@ -506,6 +506,8 @@ export function ProjectDetailPage() {
         </div>
       </header>
 
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.85fr)_minmax(300px,1fr)] xl:gap-5">
+        <div className="min-w-0 space-y-4">
       <div className="rounded-xl border border-neutral-200/70 bg-white p-6 shadow-sm">
         <div className="mb-3 flex items-start justify-between gap-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Project Overview</h2>
@@ -767,6 +769,7 @@ export function ProjectDetailPage() {
           </div>
         )}
 
+        </div>
         {/* Shipment hold */}
         {!editing && project.needsAttention.blockedShipment && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4">
@@ -813,6 +816,12 @@ export function ProjectDetailPage() {
           </div>
         )}
 
+        {/* AI Assistant */}
+        {!editing && <AIAssistantPanel projectId={project.id} projectName={project.projectName} />}
+
+        </div>
+        <aside className="min-w-0 space-y-4">
+          <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
         {/* Workflow strip — presentational only */}
         {!editing && (
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">Workflow</h2>
@@ -874,9 +883,8 @@ export function ProjectDetailPage() {
         )}
         {actionError && <p className="mb-4 text-sm text-red-600">{actionError}</p>}
 
-        {/* AI Assistant */}
-        {!editing && <AIAssistantPanel projectId={project.id} projectName={project.projectName} />}
-
+          </section>
+          <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
         {/* Activity timeline */}
         <div>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">Activity Timeline</h2>
@@ -890,7 +898,8 @@ export function ProjectDetailPage() {
               </div>
             ))}
           </div>
-        </div>
+        </div>          </section>
+        </aside>
       </div>
     </div>
   );
