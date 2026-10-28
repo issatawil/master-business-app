@@ -469,8 +469,8 @@ export function ProjectDetailPage() {
 
       </header>
 
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.85fr)_minmax(300px,1fr)] xl:gap-5">
-        <div className="min-w-0 space-y-4">
+      <div data-testid="project-detail-grid" className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.85fr)_minmax(300px,1fr)] xl:gap-5">
+        <div data-testid="project-main-column" className="min-w-0 space-y-4">
       <div className="rounded-xl border border-neutral-200/70 bg-white p-6 shadow-sm">
         <div className="mb-3 flex items-start justify-between gap-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Project Overview</h2>
@@ -823,7 +823,7 @@ export function ProjectDetailPage() {
         {!editing && <AIAssistantPanel projectId={project.id} projectName={project.projectName} />}
 
         </div>
-        <aside className="min-w-0 space-y-4">
+        <aside data-testid="project-sidebar-column" className="min-w-0 space-y-4">
           <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
         {/* Workflow strip — presentational only */}
         {!editing && (
