@@ -225,9 +225,9 @@ test("Payment can be recorded from Figma Payments table", async ({page}) => {
   await boot(page,"ADMIN");
   await page.goto("/payments");
   await page.getByRole("button",{name:"Record payment"}).first().click();
-  await page.getByPlaceholder("Amount").fill("100");
+  await page.locator('input[placeholder="Amount"]:visible').fill("100");
   await page.getByRole("button",{name:"Record Payment",exact:true}).click();
-  await expect(page.getByPlaceholder("Amount")).toHaveCount(0);
+  await expect(page.locator('input[placeholder="Amount"]:visible')).toHaveCount(0);
 });
 
 test("Ask My Business displays grounded answers and project links", async ({page}) => {
@@ -265,7 +265,7 @@ test("Mobile projects filter and open the selected project", async ({page}) => {
   await page.getByRole("combobox",{name:"Filter projects by status"}).selectOption("QUOTED");
   await expect(page.getByTestId("projects-mobile-list").locator("article")).toHaveCount(1);
   await page.getByPlaceholder("Search projects or customers...").fill("Acme Office");
-  await expect(page.getByText("Acme Office Furniture Batch 3")).toBeVisible();
+  await expect(page.getByTestId("projects-mobile-list").getByText("Acme Office Furniture Batch 3")).toBeVisible();
   await page.getByRole("link",{name:"View project details"}).click();
   await expect(page).toHaveURL(/\/projects\/p2$/);
 });
