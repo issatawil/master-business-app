@@ -21,7 +21,7 @@ export function CustomersPage() {
   const deleteCustomer = useDeleteCustomer();
   const canManage = user?.role === "ADMIN" || user?.role === "SALES";
 
-  const [showCreate, setShowCreate] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: "", contactName: "", contactEmail: "", country: "", paymentTerms: "" });
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -111,7 +111,7 @@ export function CustomersPage() {
 
       {showCreate && (
         <form onSubmit={handleCreate} className="mb-4 max-w-3xl rounded-xl border border-neutral-200/70 bg-white p-5 shadow-sm">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <input
               required
               placeholder="Name"

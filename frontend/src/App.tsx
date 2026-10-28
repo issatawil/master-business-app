@@ -42,7 +42,7 @@ function App() {
       <Route
         path="/projects/new"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute roles={["ADMIN", "SALES"]}>
             <Layout>
               <NewProjectPage />
             </Layout>

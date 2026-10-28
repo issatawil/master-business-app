@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "seqa/figma-all-screens"
+      - "seqa/figma-fidelity-and-workflows"
   workflow_dispatch:
 
 permissions:
