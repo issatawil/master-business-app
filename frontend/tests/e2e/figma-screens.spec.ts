@@ -191,7 +191,7 @@ test("Create RFQ form submits real validated fields", async ({page}) => {
   await boot(page,"SALES");
   await page.goto("/projects/new");
   await page.getByText("Project Name").locator("..").locator("input").fill("New sample RFQ");
-  await page.getByText("Customer", {exact:true}).locator("..").locator("select").selectOption("c1");
+  await page.locator("#new-project-customer").selectOption("c1");
   await page.getByText("Est. Revenue (rough ask)").locator("..").locator("input").fill("100");
   await page.getByRole("button",{name:"Create Project"}).click();
   await expect(page).toHaveURL(/\/projects\/created-qa-01$/);
