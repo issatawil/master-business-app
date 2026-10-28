@@ -208,6 +208,7 @@ test("Admin and Procurement navigation do not leak restricted tabs", async ({pag
 test("Customer creation form posts and closes on success", async ({page}) => {
   await boot(page,"SALES");
   await page.goto("/customers");
+  await page.getByRole("button", {name:"+ Add Customer"}).click();
   await page.getByPlaceholder("Name", {exact:true}).fill("New Customer");
   await page.getByRole("button",{name:"Create Customer"}).click();
   await expect(page.getByPlaceholder("Name", {exact:true})).toHaveCount(0);
@@ -216,6 +217,7 @@ test("Customer creation form posts and closes on success", async ({page}) => {
 test("Supplier creation form posts and closes on success", async ({page}) => {
   await boot(page,"PROCUREMENT");
   await page.goto("/suppliers");
+  await page.getByRole("button", {name:"+ Add Supplier"}).click();
   await page.getByPlaceholder("Name", {exact:true}).fill("New Supplier");
   await page.getByRole("button",{name:"Create Supplier"}).click();
   await expect(page.getByPlaceholder("Name", {exact:true})).toHaveCount(0);
