@@ -127,7 +127,7 @@ const desktop: Screen[] = [
   {figma:"03",label:"Dashboard — Sales",url:"/",role:"SALES",expected:"Sales Overview"},
   {figma:"04",label:"Dashboard — Procurement",url:"/",role:"PROCUREMENT",expected:"Procurement Overview"},
   {figma:"05",label:"Daily Brief drawer",url:"/",role:"ADMIN",expected:"Recommended Focus",action:"brief"},
-  {figma:"06",label:"Notification dropdown",url:"/",role:"ADMIN",expected:"Overdue Projects",action:"bell"},
+  {figma:"06",label:"Notification dropdown",url:"/",role:"ADMIN",expected:"Notifications (",action:"bell"},
   {figma:"07",label:"Projects list",url:"/projects",role:"ADMIN",expected:"Manage customer requests"},
   {figma:"08",label:"New RFQ",url:"/projects/new",role:"SALES",expected:"New Project (RFQ)"},
   {figma:"09",label:"Project detail — Admin",url:"/projects/p1",role:"ADMIN",expected:"Financial Overview"},
@@ -162,7 +162,7 @@ for (const screen of [...desktop, ...mobile]) {
       await page.getByRole("button", {name:"Generate", exact:true}).click();
       await page.getByRole("button", {name:/View details/}).click();
     }
-    if (screen.action === "bell") await page.getByRole("button", {name:"Overdue notifications"}).click();
+    if (screen.action === "bell") await page.getByRole("button", {name:"Notifications"}).click();
     if (screen.action === "override") await page.getByRole("button", {name:"Admin Override"}).click();
     if (screen.action === "drawer") await page.getByRole("button", {name:"Open menu"}).click();
     const key = screen.expected;
@@ -309,4 +309,23 @@ test("Figma project detail stacks columns on 419px mobile", async ({ page }) => 
   expect(side).not.toBeNull();
   expect(side!.y).toBeGreaterThanOrEqual(main!.y + main!.height - 3);
   expect(Math.abs(side!.x - main!.x)).toBeLessThan(3);
+});
+
+test("Bell aggregates overdue, shipment holds and missing actions", async ({page}) => {
+  await boot(page,"ADMIN");
+  await page.goto("/");
+  await page.getByRole("button",{name:"Notifications"}).click();
+  const popup=page.getByRole("dialog",{name:"Notifications"});
+  await expect(popup.getByText("Overdue")).toBeVisible();
+  await expect(popup.getByText("Shipment blocked")).toBeVisible();
+  await expect(popup.getByText("Missing next action")).toBeVisible();
+});
+
+test("Procurement notification alerts do not reveal customer payment holds", async ({page}) => {
+  await boot(page,"PROCUREMENT");
+  await page.goto("/");
+  await page.getByRole("button",{name:"Notifications"}).click();
+  const popup=page.getByRole("dialog",{name:"Notifications"});
+  await expect(popup.getByText("Shipment blocked")).toHaveCount(0);
+  await expect(popup.getByText("Overdue")).toBeVisible();
 });
