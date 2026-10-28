@@ -296,7 +296,7 @@ test("Figma project detail has side-by-side workflow and financial sections on d
   expect(Math.abs(side!.y - main!.y)).toBeLessThan(3);
   await expect(page.getByText("Project Overview")).toBeVisible();
   await expect(page.getByText("Financial Overview")).toBeVisible();
-  await expect(page.getByText("Activity Timeline")).toBeVisible();
+  await expect(page.getByRole("heading",{name:"Activity Timeline",exact:true})).toBeVisible();
 });
 
 test("Figma project detail stacks columns on 419px mobile", async ({ page }) => {
